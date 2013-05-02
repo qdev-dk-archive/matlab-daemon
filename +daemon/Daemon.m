@@ -14,7 +14,6 @@ classdef Daemon < handle
         minimum_time_between_alerts = 10*60 % Default is 10 minutes.
         daemon_email
         debug_enabled = false
-        call_drawnow = false
     end
     methods
         function obj = Daemon(address)
@@ -28,11 +27,13 @@ classdef Daemon < handle
             case 0
                 timeout = Inf;
             case 1
-                timeout = varargin{1}
+                timeout = varargin{1};
             otherwise
                 error('Too many parameters.');
             end
-            obj.sock.recv_timeout = timeout;
+            if ~zmq.wait(obj.sock, timeout)
+                return;
+            end
             msg = obj.sock.recv();
             if obj.debug_enabled
                 disp(['req ' msg]);
@@ -73,16 +74,10 @@ classdef Daemon < handle
             serve_start = tic();
             keep_going = true;
             while keep_going
-                t = min(0, period - toc(serve_start));
-                if obj.call_drawnow
-                    t = max(100, t);
-                end
-                obj.serve_once();
+                t = max(0, period - toc(serve_start));
+                obj.serve_once(t*1000);
                 if toc(serve_start) > period
                     keep_going = false;
-                end
-                if obj.call_drawnow
-                    drawnow;
                 end
             end
         end
