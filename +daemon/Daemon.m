@@ -41,19 +41,16 @@ classdef Daemon < handle
             rep = struct();
             try
                 msg_parsed = json.load(msg);
-                func = obj.exposed(msg_parsed.method);
                 if iscell(msg_parsed.params)
                     params = msg_parsed.params;
                 else
                     params = num2cell(msg_parsed.params);
                 end
-                switch nargout(func)
-                case 0
-                    func(params{:});
-                    rep.result = [];
-                otherwise
-                    rep.result = func(params{:});
+                if ~obj.exposed.isKey(msg_parsed.method)
+                    error('No such method: %s', msg_parsed.method);
                 end
+                func = obj.exposed(msg_parsed.method);
+                rep.result = func(params{:});
             catch err
                 rep.error = err.message;
                 if obj.alert_on_exceptions
@@ -97,7 +94,7 @@ classdef Daemon < handle
             otherwise
                 error('Too many parameters.');
             end
-            obj.expose_func(@(vararg) target.(method_name)(vararg{:}), name);
+            obj.expose_func(@(varargin) target.(method_name)(varargin{:}), name);
         end
 
         function expose_func(obj, func, name)
