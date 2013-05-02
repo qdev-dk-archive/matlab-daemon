@@ -21,6 +21,7 @@ classdef Daemon < handle
             obj.bind_address = address;
             obj.sock = zmq.socket('rep');
             obj.sock.bind(address);
+            obj.expose_func(@()obj.exposed.keys(), 'rpc.list');
         end
 
         function serve_once(obj, varargin)
