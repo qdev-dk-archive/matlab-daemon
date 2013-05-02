@@ -2,7 +2,7 @@ classdef Daemon < handle
     properties(Access=private)
         exposed = containers.Map()
         sock
-        last_warning
+        last_alert
     end
     properties(SetAccess=private)
         bind_address
@@ -13,6 +13,7 @@ classdef Daemon < handle
         alert_on_exceptions = true
         minimum_time_between_alerts = 10*60 % Default is 10 minutes.
         daemon_email
+        daemon_name = 'daemon'
         debug_enabled = false
     end
     methods
@@ -56,9 +57,7 @@ classdef Daemon < handle
                 if obj.alert_on_exceptions
                     obj.send_alert_from_exception('Exception occured', err);
                 end
-                if obj.debug_enabled
-                    disp(getReport(err));
-                end
+                disp(getReport(err));
             end
             rmsg = json.dump(rep);
             if obj.debug_enabled
@@ -108,32 +107,32 @@ classdef Daemon < handle
             if isempty(obj.alert_email)
                 return
             end
-            smtp = 'mail';
-            if ~isempty(obj.smtp_server)
-                smtp = obj.smtp_server;
-            end
-            if ~isempty(obj.daemon_email)
-                from = obj.daemon_email;
-            else
-                [~, hostname] = system('hostname');
-                from = sprintf('daemon@%s', hostname);
-            end
-            try
-                % TODO, change back settings.
-                setpref('Internet','SMTP_Server', smtp);
-                setpref('Internet','E_mail', from);
-                sendmail(obj.alert_email, subject, body);
-            catch err
-                warning(['Could not send email: ' err.message]);
+            if isempty(obj.last_alert) || toc(obj.last_alert) > obj.minimum_time_between_alerts
+                smtp = 'mail';
+                if ~isempty(obj.smtp_server)
+                    smtp = obj.smtp_server;
+                end
+                if ~isempty(obj.daemon_email)
+                    from = obj.daemon_email;
+                else
+                    [~, hostname] = system('hostname');
+                    from = sprintf('%s@%s', obj.daemon_name, hostname);
+                end
+                try
+                    % TODO, change back settings.
+                    setpref('Internet','SMTP_Server', smtp);
+                    setpref('Internet','E_mail', from);
+                    sendmail(obj.alert_email, subject, body);
+                catch err
+                    warning(['Could not send email: ' err.message]);
+                end
+                obj.last_alert = tic();
             end
         end
 
         function send_alert_from_exception(obj, subject, err)
-            if isempty(obj.last_warning) || toc(obj.last_warning) > obj.minimum_time_between_alerts
-                obj.send_alert(subject, ...
-                    getReport(err, 'extended', 'hyperlinks', 'off'));
-                obj.last_warning = tic();
-            end
+            obj.send_alert(subject, ...
+                getReport(err, 'extended', 'hyperlinks', 'off'));
         end
     end
 end
