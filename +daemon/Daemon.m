@@ -18,7 +18,7 @@ classdef Daemon < handle
     methods
         function obj = Daemon(address)
             obj.bind_address = address;
-            obj.sock = zmq.socket(zmq.Type.rep);
+            obj.sock = zmq.socket('rep');
             obj.sock.bind(address);
         end
 

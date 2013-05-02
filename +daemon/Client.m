@@ -8,7 +8,7 @@ classdef Client < handle
     methods
         function obj = Client(connect_address)
             obj.connect_address = connect_address;
-            obj.sock = zmq.socket(zmq.Type.req);
+            obj.sock = zmq.socket('req');
             obj.sock.connect(connect_address);
         end
 
