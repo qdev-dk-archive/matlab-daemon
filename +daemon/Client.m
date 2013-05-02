@@ -4,7 +4,7 @@ classdef Client < handle
     end
     properties(SetAccess=private)
         connect_address
-        func = struct()
+        remote = struct()
     end
     methods
         function obj = Client(connect_address)
@@ -13,7 +13,7 @@ classdef Client < handle
             obj.sock.connect(connect_address);
             for name = obj.call('rpc.list')
                 if isvarname(name{1})
-                    obj.func.(name{1}) = @(varargin) obj.call(name{1}, varargin{:});
+                    obj.remote.(name{1}) = @(varargin) obj.call(name{1}, varargin{:});
                 end
             end
         end
