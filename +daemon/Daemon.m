@@ -1,6 +1,6 @@
 classdef Daemon < handle
     properties(Access=private)
-        exposed = containers.Map()
+        exposed
         sock
         last_alert
     end
@@ -18,21 +18,22 @@ classdef Daemon < handle
     end
     methods
         function obj = Daemon(address)
+            obj.exposed = containers.Map();
             obj.bind_address = address;
             obj.sock = zmq.socket('rep');
             obj.sock.bind(address);
             obj.expose_func(@()obj.exposed.keys(), 'rpc.list');
         end
 
+        function delete(obj)
+            disp deleted;
+        end
+
         function serve_once(obj, varargin)
-            switch length(varargin)
-            case 0
-                timeout = Inf;
-            case 1
-                timeout = varargin{1};
-            otherwise
-                error('Too many parameters.');
-            end
+            p = inputParser();
+            p.addOptional('timeout', Inf);
+            p.parse();
+            timeout = p.Result.timeout;
             if ~zmq.wait(obj.sock, timeout)
                 return;
             end
@@ -42,17 +43,13 @@ classdef Daemon < handle
             end
             rep = struct();
             try
-                msg_parsed = json.load(msg);
-                if iscell(msg_parsed.params)
-                    params = msg_parsed.params;
+                parsed = json.load(msg);
+                if iscell(parsed.params)
+                    params = parsed.params;
                 else
-                    params = num2cell(msg_parsed.params);
+                    params = num2cell(parsed.params);
                 end
-                if ~obj.exposed.isKey(msg_parsed.method)
-                    error('No such method: %s', msg_parsed.method);
-                end
-                func = obj.exposed(msg_parsed.method);
-                rep.result = func(params{:});
+                rep.result = obj.call(parsed.method, params);
             catch err
                 rep.error = err.message;
                 if obj.alert_on_exceptions
@@ -71,8 +68,8 @@ classdef Daemon < handle
             serve_start = tic();
             keep_going = true;
             while keep_going
-                t = max(0, period - toc(serve_start));
-                obj.serve_once(t*1000);
+                time_left = max(0, period - toc(serve_start));
+                obj.serve_once(time_left*1000);
                 if toc(serve_start) > period
                     keep_going = false;
                 end
@@ -86,14 +83,10 @@ classdef Daemon < handle
         end
 
         function expose(obj, target, method_name, varargin)
-            switch length(varargin)
-            case 0
-                name = method_name;
-            case 1
-                name = varargin{1};
-            otherwise
-                error('Too many parameters.');
-            end
+            p = inputParser();
+            p.addOptional('name', method_name);
+            p.parse(varargin{:});
+            name = p.Result.name;
             obj.expose_func(@(varargin) target.(method_name)(varargin{:}), name);
         end
 
@@ -134,6 +127,15 @@ classdef Daemon < handle
         function send_alert_from_exception(obj, subject, err)
             obj.send_alert(subject, ...
                 getReport(err, 'extended', 'hyperlinks', 'off'));
+        end
+    end
+    methods(Access=private)
+        function result = call(obj, method, params)
+            if ~obj.exposed.isKey(method)
+                error('No such method: %s', msg_parsed.method);
+            end
+            func = obj.exposed(method);
+            result = func(params{:});
         end
     end
 end
