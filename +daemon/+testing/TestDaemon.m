@@ -1,15 +1,16 @@
 classdef TestDaemon < handle
     properties
         prop = 42
+        server
     end
     methods
-        function server = make(obj, address)
-            server = daemon.Daemon(address);
-            server.expose(obj, 'set_prop');
-            server.expose(obj, 'get_prop');
-            server.expose(obj, 'hello');
-            server.expose(obj, 'echo');
-            server.expose(obj, 'add');
+        function obj = TestDaemon(address)
+            obj.server = daemon.Daemon(address);
+            obj.server.expose(obj, 'set_prop');
+            obj.server.expose(obj, 'get_prop');
+            obj.server.expose(obj, 'hello');
+            obj.server.expose(obj, 'echo');
+            obj.server.expose(obj, 'add');
         end
 
         function result = set_prop(obj, val)

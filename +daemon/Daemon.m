@@ -32,8 +32,8 @@ classdef Daemon < handle
         function serve_once(obj, varargin)
             p = inputParser();
             p.addOptional('timeout', Inf);
-            p.parse();
-            timeout = p.Result.timeout;
+            p.parse(varargin{:});
+            timeout = p.Results.timeout;
             if ~zmq.wait(obj.sock, timeout)
                 return;
             end
@@ -86,7 +86,7 @@ classdef Daemon < handle
             p = inputParser();
             p.addOptional('name', method_name);
             p.parse(varargin{:});
-            name = p.Result.name;
+            name = p.Results.name;
             obj.expose_func(@(varargin) target.(method_name)(varargin{:}), name);
         end
 
@@ -113,9 +113,8 @@ classdef Daemon < handle
                     from = sprintf('%s@%s', obj.daemon_name, hostname);
                 end
                 try
-                    % TODO, change back settings.
-                    setpref('Internet','SMTP_Server', smtp);
-                    setpref('Internet','E_mail', from);
+                    cleanup1 = temp_setpref('Internet','SMTP_Server', smtp);
+                    cleanup2 = temp_setpref('Internet','E_mail', from);
                     sendmail(obj.alert_email, subject, body);
                 catch err
                     warning(['Could not send email: ' err.message]);
@@ -139,3 +138,14 @@ classdef Daemon < handle
         end
     end
 end
+
+function cleanup = temp_setpref(group, pref, value)
+    if ispref(group, pref)
+        prev = getpref(group, pref);
+        cleanup = onCleanup(@()setpref(group, pref, prev));
+    else
+        cleanup = onCleanup(@()rmpref(group, pref));
+    end
+    setpref(group, pref, value);
+end
+
