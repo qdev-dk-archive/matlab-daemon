@@ -26,10 +26,6 @@ classdef Daemon < handle
             obj.expose_func(@()[], 'rpc.heartbeat');
         end
 
-        function delete(obj)
-            disp deleted;
-        end
-
         function serve_once(obj, varargin)
             p = inputParser();
             p.addOptional('timeout', Inf);
@@ -107,16 +103,17 @@ classdef Daemon < handle
                 if ~isempty(obj.smtp_server)
                     smtp = obj.smtp_server;
                 end
+                [~, hostname] = system('hostname');
                 if ~isempty(obj.daemon_email)
                     from = obj.daemon_email;
                 else
-                    [~, hostname] = system('hostname');
                     from = sprintf('%s@%s', obj.daemon_name, hostname);
                 end
                 try
                     cleanup1 = temp_setpref('Internet','SMTP_Server', smtp);
                     cleanup2 = temp_setpref('Internet','E_mail', from);
-                    sendmail(obj.alert_email, subject, body);
+                    sendmail(obj.alert_email, subject, ...
+                        sprintf('Sent from "%s":\n%s', hostname, body));
                 catch err
                     warning(['Could not send email: ' err.message]);
                 end

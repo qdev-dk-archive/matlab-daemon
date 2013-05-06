@@ -52,7 +52,7 @@ classdef Client < handle
             p.parse(varargin{:});
             old_timeout = obj.timeout;
             cleanup = onCleanup(@()obj.set_timeout(old_timeout));
-            obj.timeout = p.Result.timeout;
+            obj.timeout = p.Results.timeout;
             obj.call('rpc.heartbeat');
         end
 
