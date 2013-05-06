@@ -23,6 +23,7 @@ classdef Daemon < handle
             obj.sock = zmq.socket('rep');
             obj.sock.bind(address);
             obj.expose_func(@()obj.exposed.keys(), 'rpc.list');
+            obj.expose_func(@()[], 'rpc.heartbeat');
         end
 
         function delete(obj)
