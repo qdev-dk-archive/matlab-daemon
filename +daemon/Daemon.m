@@ -9,12 +9,15 @@ classdef Daemon < handle
     end
     properties
         smtp_server
+        smtp_username
+        smtp_password
         alert_email
         alert_on_exceptions = true
         minimum_time_between_alerts = 10*60 % Default is 10 minutes.
         daemon_email
         daemon_name = 'daemon'
         debug_enabled = false
+        email_system_initialized = false
     end
     methods
         function obj = Daemon(address)
@@ -94,29 +97,49 @@ classdef Daemon < handle
             obj.exposed(name) = func;
         end
 
+        function initialize_email_system(obj)
+            if obj.email_system_initialized
+                return;
+            end
+
+            if ~isempty(obj.smtp_server)
+                smtp = obj.smtp_server;
+            else
+                smtp = 'mail';
+            end
+
+            if ~isempty(obj.daemon_email)
+                from = obj.daemon_email;
+            else
+                from = sprintf('%s@%s', obj.daemon_name, getHostname());
+            end
+
+            if ~isempty(obj.alert_email)
+                setpref('Internet','SMTP_Server', smtp);
+                setpref('Internet','E_mail', from);
+                if ~isempty(obj.smtp_username)
+                    props = java.lang.System.getProperties;
+                    props.setProperty('mail.smtp.auth', 'true');
+                    setpref('Internet','SMTP_Username', obj.smtp_username);
+                    setpref('Internet','SMTP_Password', obj.smtp_password);
+                end
+            end
+            obj.email_system_initialized = true;
+        end
+
         function send_alert(obj, subject, body)
             if isempty(obj.alert_email)
                 return
             end
+            obj.initialize_email_system();
             if isempty(obj.last_alert) || toc(obj.last_alert) > obj.minimum_time_between_alerts
-                smtp = 'mail';
-                if ~isempty(obj.smtp_server)
-                    smtp = obj.smtp_server;
-                end
-                [~, hostname] = system('hostname');
-                if ~isempty(obj.daemon_email)
-                    from = obj.daemon_email;
-                else
-                    from = sprintf('%s@%s', obj.daemon_name, hostname);
-                end
                 try
-                    cleanup1 = temp_setpref('Internet','SMTP_Server', smtp);
-                    cleanup2 = temp_setpref('Internet','E_mail', from);
                     sendmail(obj.alert_email, subject, ...
-                        sprintf('Sent from "%s":\n%s', hostname, body));
+                        sprintf('Sent from "%s":\n%s', getHostname(), body));
                 catch err
                     warning(['Could not send email: ' err.message]);
                 end
+
                 obj.last_alert = tic();
             end
         end
@@ -137,13 +160,7 @@ classdef Daemon < handle
     end
 end
 
-function cleanup = temp_setpref(group, pref, value)
-    if ispref(group, pref)
-        prev = getpref(group, pref);
-        cleanup = onCleanup(@()setpref(group, pref, prev));
-    else
-        cleanup = onCleanup(@()rmpref(group, pref));
-    end
-    setpref(group, pref, value);
+function hostname = getHostname()
+    [~, hostname] = system('hostname');
+    hostname = strtrim(hostname);
 end
-
